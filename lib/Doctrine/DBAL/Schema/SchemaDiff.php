@@ -162,6 +162,18 @@ class SchemaDiff
         }
 
         foreach ($this->changedTables as $tableDiff) {
+            // make sure to drop related orphan foreign keys before dropping indexes that are related to FKs
+            // @link https://github.com/doctrine/dbal/pull/4782/files
+            if ($saveMode === true && $platform->supportsForeignKeyConstraints() && $tableDiff->fromTable !== null) {
+                foreach ($this->orphanedForeignKeys as $orphanedForeignKey) {
+                    if ($orphanedForeignKey->getLocalTable()->getName() !== $tableDiff->fromTable->getName()) {
+                        continue;
+                    }
+
+                    $sql[] = $platform->getDropForeignKeySQL($orphanedForeignKey, $orphanedForeignKey->getLocalTable());
+                }
+            }
+
             $sql = array_merge($sql, $platform->getAlterTableSQL($tableDiff));
         }
 
